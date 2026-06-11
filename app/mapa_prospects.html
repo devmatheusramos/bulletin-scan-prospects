@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Church Prospects — Bulletin Scan</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<!-- Dados gerados pelo refinar_prospects.py — atualiza automaticamente quando voce roda o script -->
+<script src="prospects_data.js" onerror="console.log('prospects_data.js nao encontrado — use os botoes de diocese para carregar')"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ── HEADER ── */
+#hdr{height:50px;background:#1a3a5c;color:white;display:flex;align-items:center;gap:12px;padding:0 16px;flex-shrink:0;}
+#hdr h1{font-size:14px;font-weight:700;white-space:nowrap;}
+#hdr h1 span{color:#FFD700;}
+#hdr h1 small{color:#8ab;font-size:11px;font-weight:400;margin-left:6px;}
+#search{border:none;border-radius:20px;padding:6px 14px;font-size:12px;outline:none;width:200px;background:rgba(255,255,255,.92);}
+.hbtn{border:none;border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
+#btn-export{background:#27ae60;color:white;margin-left:auto;}
+#btn-export:disabled{background:#557;cursor:default;}
+#btn-enrich{background:#e67e22;color:white;}
+#btn-enrich:disabled{background:#557;cursor:default;}
+
+/* ── DIOCESE BAR ── */
+#dbar{height:36px;background:#f8f9fd;border-bottom:1px solid #dde3f0;display:flex;align-items:center;gap:6px;padding:0 12px;overflow-x:auto;flex-shrink:0;}
+#dbar::-webkit-scrollbar{height:3px;}
+#dbar::-webkit-scrollbar-thumb{background:#ccc;}
+.dbtn{font-size:10px;padding:4px 11px;border-radius:14px;border:1.5px solid;cursor:pointer;white-space:nowrap;font-weight:700;background:white;display:flex;align-items:center;gap:4px;transition:all .15s;}
+.dbtn:hover{filter:brightness(.9);}
+.dbtn.active{color:white!important;}
+.dbtn .sp{display:none;width:9px;height:9px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;}
+.dbtn.loading .sp{display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── BODY ── */
+#body{flex:1;display:flex;overflow:hidden;}
+#map-wrap{flex:1;position:relative;}
+#map{width:100%;height:100%;}
+
+/* ── SIDE PANEL ── */
+#panel{width:400px;flex-shrink:0;background:#fff;border-left:1px solid #dde3f0;display:flex;flex-direction:column;overflow:hidden;}
+#ptabs{display:flex;border-bottom:1px solid #eee;flex-shrink:0;}
+.ptab{flex:1;padding:9px 4px;text-align:center;font-size:11px;font-weight:700;color:#888;cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.3px;}
+.ptab.on{color:#1a3a5c;border-bottom-color:#1a3a5c;}
+#pfilters{padding:8px 12px;border-bottom:1px solid #f0f2f8;display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;}
+.fchip{font-size:10px;padding:3px 10px;border-radius:12px;cursor:pointer;border:1.5px solid #dde;color:#557;font-weight:600;}
+.fchip.on{border-color:#1a3a5c;background:#1a3a5c;color:white;}
+#plist{flex:1;overflow-y:auto;}
+#plist::-webkit-scrollbar{width:3px;}
+#plist::-webkit-scrollbar-thumb{background:#eee;}
+
+/* ── CHURCH CARD ── */
+.cc{padding:10px 12px;border-bottom:1px solid #f0f2f8;cursor:pointer;transition:background .1s;}
+.cc:hover{background:#f8f9ff;}
+.cc.sel{background:#edf3ff;}
+.cc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:4px;}
+.cc-name{font-size:12px;font-weight:700;color:#1a3a5c;line-height:1.3;flex:1;}
+.lead-badge{font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+.hot{background:#fde8e8;color:#c0392b;}
+.warm{background:#fef6e0;color:#d68910;}
+.cold{background:#e8f4fd;color:#2471a3;}
+.none{background:#f4f4f4;color:#aaa;}
+.cc-dioc{font-size:9px;padding:1px 7px;border-radius:8px;color:white;display:inline-block;margin-bottom:4px;font-weight:600;}
+.cc-row{font-size:11px;color:#555;margin:1px 0;display:flex;gap:4px;}
+.cc-row a{color:#1a6fbf;text-decoration:none;}
+.cc-row a:hover{text-decoration:underline;}
+.cc-socials{margin-top:5px;display:flex;gap:3px;flex-wrap:wrap;align-items:center;}
+.sb{font-size:10px;padding:2px 6px;border-radius:8px;font-weight:700;}
+.sy{background:#e8f5e9;color:#2e7d32;}
+.sn{background:#f5f5f5;color:#ccc;}
+.bulletin-badge{font-size:10px;padding:2px 8px;border-radius:8px;background:#fff3cd;color:#856404;font-weight:700;border:1px solid #ffc107;}
+.bulletin-badge.found{background:#d4edda;color:#155724;border-color:#28a745;}
+.score-bar{display:flex;gap:2px;align-items:center;margin-top:4px;}
+.sd{width:8px;height:8px;border-radius:50%;background:#eee;}
+.sd.on{background:#1a3a5c;}
+.enrich-note{font-size:10px;color:#aaa;font-style:italic;}
+
+/* ── STATUS BAR ── */
+#sbar{height:28px;background:#f4f6fb;border-top:1px solid #dde3f0;display:flex;align-items:center;gap:16px;padding:0 14px;font-size:11px;color:#778;flex-shrink:0;}
+#sbar b{color:#1a3a5c;}
+#sloading{color:#1a6fbf;font-weight:700;display:none;}
+
+/* ── EMPTY ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#bbb;gap:8px;text-align:center;padding:24px;}
+.empty .ico{font-size:32px;}
+.empty p{font-size:12px;line-height:1.6;}
+
+/* ── STATS ── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;}
+.stat-card{background:#f4f6fb;border-radius:8px;padding:10px 12px;}
+.stat-card .val{font-size:22px;font-weight:700;color:#1a6fbf;}
+.stat-card .lbl{font-size:10px;color:#889;}
+.stat-section{padding:0 12px 12px;}
+.stat-section h3{font-size:11px;font-weight:700;color:#1a3a5c;margin-bottom:8px;letter-spacing:.5px;text-transform:uppercase;}
+.bar-row{margin-bottom:6px;}
+.bar-row .bar-label{display:flex;justify-content:space-between;font-size:10px;color:#557;margin-bottom:2px;}
+.bar-track{height:4px;background:#eee;border-radius:2px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:2px;}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <h1>⛪ Church Prospects <span>— Bulletin Scan</span><small>powered by Atimo</small></h1>
+  <input id="search" type="text" placeholder="Search name, city..."/>
+  <button class="hbtn" id="btn-enrich" onclick="startEnrich()" disabled>🔍 Scan Websites</button>
+  <button class="hbtn" id="btn-export" onclick="exportCSV()" disabled>⬇ Export CSV</button>
+</div>
+
+<div id="dbar"></div>
+
+<div id="body">
+  <div id="map-wrap"><div id="map"></div></div>
+  <div id="panel">
+    <div id="ptabs">
+      <div class="ptab on" onclick="setTab('list')">📋 Pipeline</div>
+      <div class="ptab" onclick="setTab('stats')">📊 Stats</div>
+    </div>
+    <div id="pfilters">
+      <span class="fchip on" onclick="setFilter(null,this)">All</span>
+      <span class="fchip" onclick="setFilter('hot',this)" style="border-color:#c0392b;color:#c0392b;">🔥 Hot</span>
+      <span class="fchip" onclick="setFilter('warm',this)" style="border-color:#d68910;color:#d68910;">🟡 Warm</span>
+      <span class="fchip" onclick="setFilter('cold',this)" style="border-color:#2471a3;color:#2471a3;">🔵 Cold</span>
+      <span class="fchip" onclick="setFilter('bulletin',this)" style="border-color:#28a745;color:#28a745;">📄 Has Bulletin</span>
+      <span class="fchip" onclick="setFilter('nophone',this)">❌ No Phone</span>
+    </div>
+    <div id="plist"><div class="empty"><div class="ico">⛪</div><p>Click a diocese above<br/>to load its churches.</p></div></div>
+  </div>
+</div>
+
+<div id="sbar">
+  <span>Total: <b id="s0">0</b></span>
+  <span>🔥 Hot: <b id="s1">0</b></span>
+  <span>🟡 Warm: <b id="s2">0</b></span>
+  <span>📄 Bulletin: <b id="s3">0</b></span>
+  <span>📞 Phone: <b id="s4">0</b></span>
+  <span>🌐 Web: <b id="s5">0</b></span>
+  <span>✉ Email: <b id="s6">0</b></span>
+  <span id="sloading">⏳ <span id="sloadmsg">Loading...</span></span>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// DIOCESES
+// ═══════════════════════════════════════
+var D={
+  "Archdiocese of Miami":             {c:"#c0392b",b:[24.4,-81.9,25.97,-80.0]},
+  "Diocese of Fort Lauderdale":       {c:"#1a6fbf",b:[25.97,-80.55,26.38,-80.0]},
+  "Diocese of Palm Beach":            {c:"#27ae60",b:[26.38,-81.0,27.7,-79.9]},
+  "Diocese of Orlando":               {c:"#8e44ad",b:[27.7,-82.1,29.5,-80.5]},
+  "Diocese of Venice":                {c:"#e67e22",b:[25.8,-82.5,27.7,-80.5]},
+  "Diocese of St. Augustine":         {c:"#16a085",b:[29.0,-82.5,31.1,-80.0]},
+  "Diocese of Pensacola-Tallahassee": {c:"#d35400",b:[29.5,-87.7,31.1,-84.0]},
+  "Archdiocese of New York":          {c:"#2c3e50",b:[40.5,-74.3,41.1,-73.7]},
+  "Diocese of Rockville Centre":      {c:"#7f8c8d",b:[40.5,-74.0,41.1,-71.8]},
+  "Archdiocese of Boston":            {c:"#6c3483",b:[42.0,-71.5,42.7,-70.6]},
+  "Archdiocese of Chicago":           {c:"#1a535c",b:[41.5,-88.3,42.5,-87.5]},
+  "Archdiocese of Los Angeles":       {c:"#b03a2e",b:[33.5,-118.7,34.8,-117.5]},
+  "Archdiocese of São Paulo":         {c:"#6E2594",b:[-24.0,-47.0,-23.2,-46.2]},
+  "Other":                            {c:"#95a5a6",b:null}
+};
+
+// ═══════════════════════════════════════
+// ATIMO EXCLUSIONS
+// ═══════════════════════════════════════
+var ATIMO=["immaculate conception","san lazaro","prince of peace","st. matthew",
+  "our lady of the lakes","st. pius x","st. timothy","our lady of lourdes",
+  "st. mary magdalen","st. gregory","st. martha","st. john neumann","saint louis",
+  "our lady of guadalupe","santuario nacional","archbishop coleman","missionmary",
+  "st. katharine drexel","sts. peter","san isidro","hospitality de miami",
+  "friends of the sanctuary","st. theresa","atimo","mercova","shift f1",
+  "susan neuman","mission mary","edmund rice","parroquia santa"];
+function isAtimo(n){var l=n.toLowerCase();return ATIMO.some(function(a){return l.includes(a);});}
+
+// ═══════════════════════════════════════
+// BULLETIN DETECTION PATTERNS (from agent1_scraper.py)
+// ═══════════════════════════════════════
+var BULLETIN_HREF_RE = /href=["']([^"']*(?:bulletin|boletim|boletin|weekly)[^"']*\.(?:pdf|php)[^"']*|[^"']*\d{8}[^"']*\.pdf)["']/gi;
+var BULLETIN_LINK_RE = /href=["']([^"']+\.pdf)["']/gi;
+var BULLETIN_KEYWORD_RE = /bulletin|boletim|boletin|parish.?newsletter|weekly.?flyer/i;
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+var map, clusterGroup;
+var data=[], markers=[], seen=new Set();
+var loaded=new Set(), loading=new Set();
+var filterLead=null, currentTab='list', selCard=null;
+var enrichQ=[], enrichBusy=false;
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+
+// ═══════════════════════════════════════
+// SCORING
+// ═══════════════════════════════════════
+function classify(c){
+  // Bulletin Scan fit score (0-5)
+  var sc = 0;
+  if(c.website)           sc+=1;
+  if(c.bulletinFound)     sc+=2; // biggest signal
+  if(c.socials.facebook||c.socials.instagram) sc+=1;
+  if(c.socials.youtube)   sc+=0.5;
+  if(c.phone)             sc+=0.5;
+  sc = Math.min(Math.round(sc), 5);
+  c.score = sc;
+  if(!c.website)                    c.lead='none';
+  else if(c.bulletinFound && sc>=3) c.lead='hot';
+  else if(c.website && sc>=2)       c.lead='warm';
+  else                               c.lead='cold';
+}
+
+// ═══════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════
+window.onload=function(){
+  map=L.map('map',{zoomControl:true,attributionControl:false});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+  map.setView([26.0,-80.2],9);
+  clusterGroup=L.markerClusterGroup({
+    iconCreateFunction:mkCluster,
+    disableClusteringAtZoom:13,
+    maxClusterRadius:55,
+    showCoverageOnHover:false,
+    animate:true,spiderfyOnMaxZoom:true
+  });
+  map.addLayer(clusterGroup);
+  buildDBar();
+  document.getElementById('search').addEventListener('input',render);
+
+  // Auto-carrega dados do prospects_data.js se disponivel
+  if(typeof PRELOADED_DATA !== 'undefined' && PRELOADED_DATA.length){
+    PRELOADED_DATA.forEach(function(c){
+      if(seen.has(c.name.toLowerCase())) return;
+      seen.add(c.name.toLowerCase());
+      // normaliza campos do formato do Python
+      c.bulletinFound = c.bulletinFound || c.bulletin_found || false;
+      c.bulletinUrl   = c.bulletinUrl   || c.bulletin_url   || null;
+      if(!c.score) c.score = 0;
+      if(!c.lead)  c.lead  = 'none';
+      if(!c.socials) c.socials = {facebook:false,instagram:false,youtube:false,twitter:false};
+      data.push(c);
+      addMarker(c);
+      loaded.add(c.diocese);
+    });
+    buildDBar();
+    document.getElementById('btn-export').disabled = false;
+    document.getElementById('btn-enrich').disabled = false;
+    render(); updateStatus();
+    // zoom para FL por padrao
+    map.setView([26.5,-80.5],8);
+    setLoading('',false);
+    var n = PRELOADED_DATA.length;
+    document.getElementById('sloadmsg').textContent = n + ' igrejas carregadas do prospects_data.js';
+    document.getElementById('sloading').style.display = 'inline';
+    setTimeout(function(){ document.getElementById('sloading').style.display='none'; }, 4000);
+  }
+};
+
+function pinIcon(col,lead){
+  var ring = lead==='hot'?'#c0392b':lead==='warm'?'#d68910':lead==='cold'?'#2471a3':'#aaa';
+  return L.divIcon({
+    className:'',
+    html:'<div style="position:relative;width:28px;height:40px;display:flex;flex-direction:column;align-items:center;">'+
+      '<div style="position:absolute;top:-9px;color:'+col+';font-size:11px;font-weight:700;text-shadow:0 1px 2px rgba(255,255,255,.9);">✝</div>'+
+      '<div style="width:28px;height:28px;border-radius:50%;background:'+col+';border:2.5px solid '+ring+';box-shadow:0 2px 8px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;">'+
+      '<span style="color:white;font-size:12px;">⛪</span></div>'+
+      '<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid '+col+';margin-top:-1px;"></div>'+
+      '</div>',
+    iconSize:[28,49],iconAnchor:[14,49],popupAnchor:[0,-51]
+  });
+}
+function mkCluster(c){
+  var n=c.getChildCount(),s=n<10?30:n<30?40:52,fs=n<10?11:n<30?13:16;
+  var col='#1a6fbf';try{col=c.getAllChildMarkers()[0]._col;}catch(e){}
+  return L.divIcon({
+    html:'<div style="width:'+s+'px;height:'+s+'px;border-radius:50%;background:'+col+';border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:'+fs+'px;font-weight:700;color:white;">'+n+'</div>',
+    className:'',iconSize:[s,s]
+  });
+}
+
+function addMarker(c){
+  var col=(D[c.diocese]||D.Other).c;
+  var m=L.marker([c.lat,c.lng],{icon:pinIcon(col,c.lead)});
+  m._data=c; m._col=col;
+  m.bindPopup(miniPop(c),{maxWidth:240});
+  m.on('click',function(){selectCard(c,m);});
+  markers.push(m);
+  if(passFilter(c)) clusterGroup.addLayer(m);
+}
+
+function refreshMarker(c){
+  var m=markers.find(function(x){return x._data===c;});
+  if(!m) return;
+  var col=(D[c.diocese]||D.Other).c;
+  m.setIcon(pinIcon(col,c.lead));
+  if(m.isPopupOpen()) m.setPopupContent(miniPop(c));
+}
+
+function miniPop(c){
+  var html='<div style="font-family:Segoe UI,sans-serif;">';
+  html+='<b style="color:#1a3a5c;">'+c.name+'</b><br>';
+  if(c.bulletinFound) html+='<span style="background:#d4edda;color:#155724;font-size:10px;padding:1px 6px;border-radius:6px;font-weight:700;">📄 Bulletin found</span><br>';
+  html+='<span style="font-size:10px;color:#'+({hot:'c0392b',warm:'d68910',cold:'2471a3',none:'aaa'}[c.lead])+';">'+leadLabel(c.lead)+'</span> ';
+  html+='<span style="font-size:10px;color:#888;">Score '+c.score+'/5</span>';
+  if(c.phone) html+='<br><span style="font-size:11px;">📞 <a href="tel:'+c.phone+'">'+c.phone+'</a></span>';
+  if(c.website) html+='<br><span style="font-size:11px;">🌐 <a href="'+c.website+'" target="_blank">Website</a></span>';
+  html+='</div>';
+  return html;
+}
+
+function leadLabel(l){return{hot:'🔥 Hot Lead',warm:'🟡 Warm Lead',cold:'🔵 Cold Lead',none:'⚫ No Website'}[l]||'';}
+
+// ═══════════════════════════════════════
+// DIOCESE BAR
+// ═══════════════════════════════════════
+function buildDBar(){
+  var bar=document.getElementById('dbar');
+  bar.innerHTML='';
+  Object.keys(D).filter(function(k){return k!=='Other';}).forEach(function(name){
+    var d=D[name];
+    var isLoaded=loaded.has(name), isLoading=loading.has(name);
+    var cnt=data.filter(function(c){return c.diocese===name;}).length;
+    var btn=document.createElement('div');
+    btn.className='dbtn'+(isLoaded?' active':'')+(isLoading?' loading':'');
+    btn.style.borderColor=d.c; btn.style.color=isLoaded?'white':d.c;
+    if(isLoaded) btn.style.background=d.c;
+    btn.innerHTML='<span class="sp"></span>'+name+(isLoaded?' ('+cnt+')':' ↓');
+    btn.onclick=function(){
+      if(isLoading) return;
+      if(!isLoaded) loadDiocese(name);
+    };
+    bar.appendChild(btn);
+  });
+}
+
+// ═══════════════════════════════════════
+// OVERPASS FETCH
+// ═══════════════════════════════════════
+function getDiocese(lat,lng){
+  for(var n in D){if(n==='Other')continue;var b=D[n].b;if(!b)continue;if(lat>=b[0]&&lat<=b[2]&&lng>=b[1]&&lng<=b[3])return n;}
+  return 'Other';
+}
+
+async function fetchArea(s,w,n,e,attempt){
+  attempt=attempt||1;
+  var q='[out:json][timeout:60];('+
+    'node["amenity"="place_of_worship"]["religion"="christian"]["denomination"="catholic"]('+s+','+w+','+n+','+e+');'+
+    'way["amenity"="place_of_worship"]["religion"="christian"]["denomination"="catholic"]('+s+','+w+','+n+','+e+');'+
+    'node["amenity"="place_of_worship"]["name"~"Catholic",i]('+s+','+w+','+n+','+e+');'+
+    'way["amenity"="place_of_worship"]["name"~"Catholic",i]('+s+','+w+','+n+','+e+');'+
+  ');out center tags;';
+  var ep=attempt===1?'https://overpass-api.de/api/interpreter':'https://overpass.kumi.systems/api/interpreter';
+  try{
+    var r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'data='+encodeURIComponent(q),signal:AbortSignal.timeout(65000)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return (await r.json()).elements||[];
+  }catch(e){if(attempt<3){await sleep(2500);return fetchArea(s,w,n,e,attempt+1);}throw e;}
+}
+
+async function loadDiocese(name){
+  if(loaded.has(name)||loading.has(name)) return;
+  loading.add(name); buildDBar();
+  setLoading('Loading '+name+'...',true);
+  var bb=D[name].b; // [s,w,n,e]
+  var CHUNK=1.2, chunks=[];
+  for(var la=bb[0];la<bb[2];la+=CHUNK)
+    for(var lo=bb[1];lo<bb[3];lo+=CHUNK)
+      chunks.push([la,lo,Math.min(la+CHUNK,bb[2]),Math.min(lo+CHUNK,bb[3])]);
+
+  for(var ci=0;ci<chunks.length;ci++){
+    var ch=chunks[ci];
+    setLoading('Loading '+name+' ('+(ci+1)+'/'+chunks.length+')...',true);
+    try{
+      var els=await fetchArea(ch[0],ch[1],ch[2],ch[3]);
+      ingest(els,name);
+    }catch(e){console.warn('chunk fail',e);}
+    if(ci<chunks.length-1) await sleep(1200);
+  }
+
+  loading.delete(name); loaded.add(name); buildDBar();
+  setLoading('',false);
+  document.getElementById('btn-export').disabled=false;
+  document.getElementById('btn-enrich').disabled=false;
+
+  var pts=data.filter(function(c){return c.diocese===name;});
+  if(pts.length) map.fitBounds(L.latLngBounds(pts.map(function(c){return[c.lat,c.lng];})).pad(0.08));
+}
+
+function ingest(els,diocese){
+  els.forEach(function(el){
+    var t=el.tags||{};
+    var name=(t.name||t['name:en']||'').trim();
+    if(!name||seen.has(name.toLowerCase())||isAtimo(name)) return;
+    var lat=el.lat||(el.center&&el.center.lat);
+    var lng=el.lon||(el.center&&el.center.lon);
+    if(!lat||!lng) return;
+    seen.add(name.toLowerCase());
+    var phone=(t.phone||t['contact:phone']||'').replace(/\s+/g,' ').trim()||null;
+    var website=t.website||t['contact:website']||t.url||null;
+    var email=t.email||t['contact:email']||null;
+    var addr=[t['addr:housenumber'],t['addr:street'],t['addr:city'],t['addr:state'],t['addr:postcode']].filter(Boolean).join(', ');
+    var c={name,lat,lng,address:addr,phone,website,email,
+      diocese:getDiocese(lat,lng)||diocese,
+      socials:{website:!!website,facebook:false,instagram:false,youtube:false,twitter:false},
+      bulletinFound:false,bulletinUrl:null,
+      enriched:false,enriching:false,score:0,lead:'none'};
+    classify(c);
+    data.push(c);
+    if(website) enrichQ.push(c);
+    addMarker(c);
+    render(); updateStatus();
+  });
+}
+
+// ═══════════════════════════════════════
+// WEBSITE ENRICHMENT + BULLETIN DETECTION
+// ═══════════════════════════════════════
+async function enrichOne(c){
+  if(!c.website||c.enriched) return;
+  c.enriching=true; render();
+  var proxy='https://api.allorigins.win/get?url='+encodeURIComponent(c.website);
+  try{
+    var r=await fetch(proxy,{signal:AbortSignal.timeout(10000)});
+    if(!r.ok) throw new Error();
+    var j=await r.json(); var h=j.contents||'';
+
+    // Social media
+    c.socials.facebook =!!(h.match(/facebook\.com\/(?!sharer|share|plugins|dialog)([a-zA-Z0-9_.]{3,})/));
+    c.socials.instagram=!!(h.match(/instagram\.com\/([a-zA-Z0-9_.]{2,})/));
+    c.socials.youtube  =!!(h.match(/youtube\.com\/(channel|c|@|user)\//));
+    c.socials.twitter  =!!(h.match(/(?:twitter|x)\.com\/([a-zA-Z0-9_]{2,})/));
+
+    // Bulletin detection (patterns from agent1_scraper.py)
+    var hasBulletinHref = BULLETIN_HREF_RE.test(h);
+    var hasPdfLink      = BULLETIN_LINK_RE.test(h);
+    var hasBulletinKw   = BULLETIN_KEYWORD_RE.test(h);
+    c.bulletinFound = hasBulletinHref || (hasPdfLink && hasBulletinKw);
+    if(c.bulletinFound){
+      // try to extract actual PDF link
+      var m; BULLETIN_LINK_RE.lastIndex=0;
+      while((m=BULLETIN_LINK_RE.exec(h))!==null){
+        if(/\d{6,8}|bulletin|boletim/i.test(m[1])){ c.bulletinUrl=m[1]; break; }
+      }
+    }
+
+    // Email fallback
+    if(!c.email){
+      var em=(h.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g)||[])
+        .filter(function(e){return !e.match(/\.(png|jpg|gif|css|js)$/i)&&!e.includes('sentry')&&!e.includes('@2')&&!e.includes('example');});
+      if(em.length) c.email=em[0];
+    }
+  }catch(e){}
+  c.enriched=true; c.enriching=false;
+  classify(c); refreshMarker(c); render(); updateStatus();
+}
+
+async function startEnrich(){
+  if(enrichBusy) return;
+  enrichBusy=true;
+  document.getElementById('btn-enrich').disabled=true;
+  document.getElementById('btn-enrich').textContent='🔍 Scanning...';
+  var CONC=2, idx=0;
+  setLoading('Scanning websites for bulletins...',true);
+  async function worker(){
+    while(idx<enrichQ.length){
+      var c=enrichQ[idx++];
+      if(!c.enriched){
+        setLoading('Scanning '+(idx)+'/'+enrichQ.length+': '+c.name,true);
+        await enrichOne(c);
+        await sleep(350);
+      }
+    }
+  }
+  var ws=[];for(var i=0;i<CONC;i++) ws.push(worker());
+  await Promise.all(ws);
+  enrichBusy=false;
+  setLoading('',false);
+  document.getElementById('btn-enrich').textContent='✅ Scan Done';
+}
+
+// ═══════════════════════════════════════
+// FILTERS & RENDER
+// ═══════════════════════════════════════
+function passFilter(c){
+  if(filterLead==='hot')      return c.lead==='hot';
+  if(filterLead==='warm')     return c.lead==='warm';
+  if(filterLead==='cold')     return c.lead==='cold';
+  if(filterLead==='bulletin') return c.bulletinFound;
+  if(filterLead==='nophone')  return !c.phone;
+  return true;
+}
+
+function setFilter(f,el){
+  filterLead=f;
+  document.querySelectorAll('.fchip').forEach(function(x){x.classList.remove('on');});
+  el.classList.add('on');
+  applyMapFilter(); render();
+}
+
+function applyMapFilter(){
+  clusterGroup.clearLayers();
+  var q=document.getElementById('search').value.toLowerCase().trim();
+  markers.forEach(function(m){
+    var c=m._data;
+    var mq=!q||c.name.toLowerCase().includes(q)||(c.address&&c.address.toLowerCase().includes(q));
+    if(mq&&passFilter(c)) clusterGroup.addLayer(m);
+  });
+}
+
+var renderT=null;
+function render(){clearTimeout(renderT);renderT=setTimeout(_render,60);}
+function _render(){
+  applyMapFilter();
+  if(currentTab==='list') renderList();
+  else renderStats();
+}
+
+function renderList(){
+  var q=document.getElementById('search').value.toLowerCase().trim();
+  var filtered=data.filter(function(c){
+    return (!q||c.name.toLowerCase().includes(q)||(c.address&&c.address.toLowerCase().includes(q)))&&passFilter(c);
+  });
+  // sort: hot first, then by score desc
+  filtered.sort(function(a,b){
+    var order={hot:0,warm:1,cold:2,none:3};
+    if(order[a.lead]!==order[b.lead]) return order[a.lead]-order[b.lead];
+    return b.score-a.score;
+  });
+
+  document.getElementById('plist').innerHTML='';
+  if(!filtered.length){
+    document.getElementById('plist').innerHTML='<div class="empty"><div class="ico">'+(data.length?'🔍':'⛪')+'</div><p>'+(data.length?'No results match.':'Select a diocese to load churches.')+'</p></div>';
+    return;
+  }
+
+  var frag=document.createDocumentFragment();
+  filtered.forEach(function(c){
+    var col=(D[c.diocese]||D.Other).c;
+    var el=document.createElement('div');
+    el.className='cc'+(selCard===c?' sel':'');
+    el.innerHTML=
+      '<div class="cc-top">'+
+        '<div class="cc-name">'+c.name+'</div>'+
+        '<div class="lead-badge '+c.lead+'">'+leadLabel(c.lead)+'</div>'+
+      '</div>'+
+      '<div class="cc-dioc" style="background:'+col+'">'+c.diocese+'</div>'+(c.bulletinFound?'&nbsp;<span class="bulletin-badge found">📄 Bulletin PDF</span>':c.enriched&&c.website?'<span class="bulletin-badge">📄 No bulletin</span>':'')+
+      (c.address?'<div class="cc-row">📍 '+c.address+'</div>':'')+
+      (c.phone?'<div class="cc-row">📞 <a href="tel:'+c.phone+'">'+c.phone+'</a></div>':'')+
+      (c.website?'<div class="cc-row">🌐 <a href="'+c.website+'" target="_blank">'+c.website.replace(/^https?:\/\//,'').replace(/\/$/,'').slice(0,38)+'</a></div>':'')+
+      (c.email?'<div class="cc-row">✉ <a href="mailto:'+c.email+'">'+c.email+'</a></div>':'')+
+      '<div class="cc-socials">'+
+        (c.website?'<span class="sb '+(c.bulletinFound?'sy':'sn')+'">📄</span>':'')+
+        '<span class="sb '+(c.socials.facebook?'sy':'sn')+'">📘</span>'+
+        '<span class="sb '+(c.socials.instagram?'sy':'sn')+'">📷</span>'+
+        '<span class="sb '+(c.socials.youtube?'sy':'sn')+'">▶</span>'+
+        '<span class="sb '+(c.socials.twitter?'sy':'sn')+'">𝕏</span>'+
+        (c.enriching?'<span class="enrich-note">scanning...</span>':'')+
+      '</div>'+
+      '<div class="score-bar">'+Array.from({length:5},function(_,i){return'<span class="sd'+(i<c.score?' on':'')+'"></span>';}).join('')+
+      '<span style="font-size:9px;color:#aaa;margin-left:4px;">'+c.score+'/5 Bulletin Scan fit</span></div>';
+    el.addEventListener('click',function(e){if(e.target.tagName==='A')return;selectCard(c,null);});
+    frag.appendChild(el);
+  });
+  document.getElementById('plist').appendChild(frag);
+}
+
+function selectCard(c,m){
+  selCard=c; render();
+  map.flyTo([c.lat,c.lng],15,{animate:true,duration:1.1});
+  if(!m) m=markers.find(function(x){return x._data===c;});
+  if(m) setTimeout(function(){m.openPopup();},1200);
+  setTimeout(function(){
+    document.querySelectorAll('.cc').forEach(function(el){
+      if(el.querySelector('.cc-name')&&el.querySelector('.cc-name').textContent===c.name)
+        el.scrollIntoView({behavior:'smooth',block:'nearest'});
+    });
+  },50);
+}
+
+function setTab(t){
+  currentTab=t;
+  document.querySelectorAll('.ptab').forEach(function(x,i){x.classList.toggle('on',['list','stats'][i]===t);});
+  render();
+}
+
+// ═══════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════
+function renderStats(){
+  var total=data.length;
+  if(!total){document.getElementById('plist').innerHTML='<div class="empty"><div class="ico">📊</div><p>No data yet.</p></div>';return;}
+  var hot=data.filter(function(c){return c.lead==='hot';}).length;
+  var warm=data.filter(function(c){return c.lead==='warm';}).length;
+  var bull=data.filter(function(c){return c.bulletinFound;}).length;
+  var web=data.filter(function(c){return c.website;}).length;
+  var ph=data.filter(function(c){return c.phone;}).length;
+  var em=data.filter(function(c){return c.email;}).length;
+  var ig=data.filter(function(c){return c.socials.instagram;}).length;
+  var fb=data.filter(function(c){return c.socials.facebook;}).length;
+
+  var byD={};data.forEach(function(c){byD[c.diocese]=(byD[c.diocese]||0)+1;});
+
+  var h='<div class="stat-grid">';
+  [[total,'Total Churches'],[hot,'🔥 Hot Leads'],[bull,'📄 Has Bulletin'],[warm,'🟡 Warm Leads'],[web,'🌐 Website'],[ph,'📞 Phone']].forEach(function(s){
+    h+='<div class="stat-card"><div class="val">'+s[0]+'</div><div class="lbl">'+s[1]+'</div></div>';
+  });
+  h+='</div><div class="stat-section"><h3>Online Presence</h3>';
+  [['Bulletin PDF',bull],['Facebook',fb],['Instagram',ig],['Email',em]].forEach(function(s){
+    var pct=total?Math.round(s[1]/total*100):0;
+    h+='<div class="bar-row"><div class="bar-label"><span>'+s[0]+'</span><span>'+s[1]+' ('+pct+'%)</span></div>'+
+       '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:#1a3a5c;"></div></div></div>';
+  });
+  h+='</div><div class="stat-section"><h3>By Diocese</h3>';
+  Object.keys(byD).sort(function(a,b){return byD[b]-byD[a];}).forEach(function(d){
+    var col=(D[d]||D.Other).c; var pct=Math.round(byD[d]/total*100);
+    h+='<div class="bar-row"><div class="bar-label"><span style="color:'+col+';font-weight:700;">'+d+'</span><span>'+byD[d]+'</span></div>'+
+       '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+col+';"></div></div></div>';
+  });
+  h+='</div>';
+  document.getElementById('plist').innerHTML=h;
+}
+
+// ═══════════════════════════════════════
+// STATUS BAR
+// ═══════════════════════════════════════
+function updateStatus(){
+  document.getElementById('s0').textContent=data.length;
+  document.getElementById('s1').textContent=data.filter(function(c){return c.lead==='hot';}).length;
+  document.getElementById('s2').textContent=data.filter(function(c){return c.lead==='warm';}).length;
+  document.getElementById('s3').textContent=data.filter(function(c){return c.bulletinFound;}).length;
+  document.getElementById('s4').textContent=data.filter(function(c){return c.phone;}).length;
+  document.getElementById('s5').textContent=data.filter(function(c){return c.website;}).length;
+  document.getElementById('s6').textContent=data.filter(function(c){return c.email;}).length;
+}
+function setLoading(msg,on){
+  document.getElementById('sloading').style.display=on?'inline':'none';
+  if(msg) document.getElementById('sloadmsg').textContent=msg;
+}
+
+// ═══════════════════════════════════════
+// CSV EXPORT
+// ═══════════════════════════════════════
+function exportCSV(){
+  var q=document.getElementById('search').value.toLowerCase().trim();
+  var rows=data.filter(function(c){
+    return (!q||c.name.toLowerCase().includes(q)||(c.address&&c.address.toLowerCase().includes(q)))&&passFilter(c);
+  }).sort(function(a,b){var o={hot:0,warm:1,cold:2,none:3};return o[a.lead]-o[b.lead]||b.score-a.score;});
+
+  var cols=['Name','Diocese','Lead','Bulletin Score','Bulletin Found','Bulletin URL','Address','Phone','Email','Website','Facebook','Instagram','YouTube','Twitter','Lat','Lng'];
+  var csv=cols.join(',')+'\n';
+  rows.forEach(function(c){
+    csv+=[c.name,c.diocese,leadLabel(c.lead),c.score,c.bulletinFound?'Yes':'No',c.bulletinUrl||'',
+      c.address||'',c.phone||'',c.email||'',c.website||'',
+      c.socials.facebook?'Yes':'No',c.socials.instagram?'Yes':'No',
+      c.socials.youtube?'Yes':'No',c.socials.twitter?'Yes':'No',c.lat,c.lng
+    ].map(function(v){return'"'+(v+'').replace(/"/g,'""')+'"';}).join(',')+'\n';
+  });
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='bulletin_scan_prospects_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# Dados gerados — nunca commitar
+app/prospects_data.js
+data/prospects_refined.csv
+
+# OS
+.DS_Store
+Thumbs.db

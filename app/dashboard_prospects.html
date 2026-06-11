@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bulletin Scan — Prospects Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117;
+    --bg2: #1a1d27;
+    --bg3: #242736;
+    --border: rgba(255,255,255,0.08);
+    --text: #f0f0f0;
+    --text2: #9ca3af;
+    --text3: #6b7280;
+    --hot: #ef4444;
+    --warm: #f59e0b;
+    --cold: #3b82f6;
+    --ns: #6b7280;
+    --green: #10b981;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #fff;
+  }
+  .header-title { font-size: 17px; font-weight: 600; }
+  .header-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .header-date { font-size: 12px; color: var(--text3); }
+
+  /* LAYOUT */
+  .main { padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
+
+  /* SECTION LABEL */
+  .section-label {
+    font-size: 10px; font-weight: 600; letter-spacing: .1em;
+    color: var(--text3); text-transform: uppercase; margin-bottom: 14px;
+  }
+
+  /* KPI STRIP */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .kpi {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .kpi-label { font-size: 11px; color: var(--text2); margin-bottom: 8px; }
+  .kpi-value { font-size: 30px; font-weight: 700; line-height: 1; }
+  .kpi-sub { font-size: 11px; margin-top: 6px; }
+  .c-total { color: var(--text); }
+  .c-hot { color: var(--hot); }
+  .c-warm { color: var(--warm); }
+  .c-cold { color: var(--cold); }
+  .c-ns { color: var(--ns); }
+
+  /* CHARTS ROW */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  /* FUNNEL */
+  .funnel-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .funnel-label { font-size: 12px; color: var(--text2); width: 90px; flex-shrink: 0; }
+  .funnel-track { flex: 1; height: 30px; background: var(--bg3); border-radius: 6px; overflow: hidden; position: relative; }
+  .funnel-bar {
+    height: 100%; border-radius: 6px;
+    display: flex; align-items: center; padding-left: 10px;
+    transition: width .6s ease;
+  }
+  .funnel-count { font-size: 13px; font-weight: 600; color: #fff; }
+  .funnel-pct { font-size: 11px; color: var(--text3); width: 36px; text-align: right; flex-shrink: 0; }
+
+  /* PRESENCE */
+  .presence-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .presence-row:last-child { border-bottom: none; }
+  .presence-left { display: flex; align-items: center; gap: 8px; color: var(--text2); }
+  .presence-right { display: flex; align-items: center; gap: 10px; }
+  .pbar-wrap { width: 100px; height: 5px; background: var(--bg3); border-radius: 3px; }
+  .pbar { height: 5px; border-radius: 3px; }
+
+  /* PRIORITY TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    font-size: 10px; font-weight: 600; letter-spacing: .06em;
+    color: var(--text3); text-transform: uppercase;
+    text-align: left; padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 3px 9px; border-radius: 20px;
+  }
+  .badge-hot { background: rgba(239,68,68,.15); color: #ef4444; }
+  .badge-warm { background: rgba(245,158,11,.15); color: #f59e0b; }
+  .badge-cold { background: rgba(59,130,246,.15); color: #3b82f6; }
+  .score-wrap { display: flex; flex-direction: column; gap: 3px; }
+  .score-txt { font-size: 12px; font-weight: 600; }
+  .score-bar { height: 4px; width: 60px; background: var(--bg3); border-radius: 2px; }
+  .score-fill { height: 4px; border-radius: 2px; }
+  .action-btn {
+    font-size: 11px; padding: 4px 10px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text2); cursor: pointer;
+    white-space: nowrap;
+  }
+  .action-btn:hover { background: rgba(255,255,255,0.1); }
+  .action-btn.primary { background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.3); color: #ef4444; }
+
+  /* ADS SECTION */
+  .ads-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 14px;
+  }
+  .ads-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+  }
+  .ads-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; margin-bottom: 10px;
+  }
+  .ads-icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+  }
+  .ads-body { font-size: 12px; color: var(--text2); line-height: 1.7; }
+  .ads-body strong { color: var(--text); font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 2px 8px; border-radius: 4px; margin-left: 6px;
+  }
+  .tag-google { background: rgba(66,133,244,.2); color: #4285F4; }
+  .tag-meta { background: rgba(24,119,242,.2); color: #1877f2; }
+  .tag-email { background: rgba(139,92,246,.2); color: #8b5cf6; }
+  .tag-call { background: rgba(16,185,129,.2); color: #10b981; }
+
+  /* INSIGHT BOX */
+  .insight {
+    background: rgba(99,102,241,.08);
+    border: 1px solid rgba(99,102,241,.2);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-top: 14px;
+  }
+  .insight strong { color: #818cf8; }
+
+  /* TABS (emails) */
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .tab {
+    font-size: 11px; padding: 5px 12px;
+    border: 1px solid var(--border); border-radius: 20px;
+    cursor: pointer; background: transparent; color: var(--text2);
+    transition: all .15s;
+  }
+  .tab:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .tab.active { background: #fff; color: #000; border-color: transparent; }
+  .email-card { display: none; }
+  .email-card.visible { display: block; }
+  .email-meta-row {
+    display: grid; grid-template-columns: 55px 1fr;
+    gap: 3px 8px; font-size: 12px; padding: 12px 16px;
+    background: var(--bg3); border-radius: var(--radius-sm);
+    margin-bottom: 14px;
+  }
+  .em-label { color: var(--text3); padding-top: 1px; }
+  .em-value { color: var(--text); }
+  .em-value a { color: #818cf8; text-decoration: none; }
+  .email-body-text {
+    font-size: 13px; line-height: 1.8; color: var(--text2);
+    white-space: pre-wrap; padding: 16px;
+    background: var(--bg3); border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+  .email-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .copy-btn {
+    font-size: 12px; padding: 7px 16px;
+    background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.3);
+    color: #818cf8; border-radius: 6px; cursor: pointer;
+  }
+  .copy-btn:hover { background: rgba(99,102,241,.25); }
+
+  /* FOOTER */
+  .footer {
+    margin-top: 40px; padding: 20px 32px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .footer-left { font-size: 12px; color: var(--text3); }
+  .footer-logo { font-size: 13px; font-weight: 600; color: var(--text2); }
+
+  @media (max-width: 800px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .charts-row, .ads-grid { grid-template-columns: 1fr; }
+    .main { padding: 20px 16px; }
+    .header { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">A</div>
+    <div>
+      <div class="header-title">Bulletin Scan — Prospects Dashboard</div>
+      <div class="header-sub">Igrejas católicas · EUA · Não-clientes Atimo</div>
+    </div>
+  </div>
+  <div class="header-date">Gerado em 11/06/2026</div>
+</div>
+
+<div class="main">
+
+  <!-- KPIs -->
+  <p class="section-label">Visão geral do pipeline</p>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Total prospectados</div>
+      <div class="kpi-value c-total">248</div>
+      <div class="kpi-sub" style="color:var(--text3)">6 dioceses · 4 estados</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">🔥 Hot leads</div>
+      <div class="kpi-value c-hot">1</div>
+      <div class="kpi-sub c-hot">já tem bulletin PDF</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">📈 Warm leads</div>
+      <div class="kpi-value c-warm">87</div>
+      <div class="kpi-sub c-warm">site + presença online</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">🔵 Cold leads</div>
+      <div class="kpi-value c-cold">37</div>
+      <div class="kpi-sub c-cold">só site, sem social</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Não adequados</div>
+      <div class="kpi-value c-ns">123</div>
+      <div class="kpi-sub" style="color:var(--text3)">sem dados online</div>
+    </div>
+  </div>
+
+  <!-- FUNIL + DIOCESE -->
+  <div class="charts-row">
+    <div class="card">
+      <p class="section-label">Funil de qualificação</p>
+      <div class="funnel-item">
+        <span class="funnel-label">Hot lead</span>
+        <div class="funnel-track">
+          <div class="funnel-bar" style="width:0.8%;background:#ef4444">
+            <span class="funnel-count">1</span>
+          </div>
+        </div>
+        <span class="funnel-pct">0.4%</span>
+      </div>
+      <div class="funnel-item">
+        <span class="funnel-label">Warm leads</span>
+        <div class="funnel-track">
+          <div class="funnel-bar" style="width:35%;background:#f59e0b">
+            <span class="funnel-count">87</span>
+          </div>
+        </div>
+        <span class="funnel-pct">35%</span>
+      </div>
+      <div class="funnel-item">
+        <span class="funnel-label">Cold leads</span>
+        <div class="funnel-track">
+          <div class="funnel-bar" style="width:15%;background:#3b82f6">
+            <span class="funnel-count">37</span>
+          </div>
+        </div>
+        <span class="funnel-pct">15%</span>
+      </div>
+      <div class="funnel-item">
+        <span class="funnel-label">Não adequados</span>
+        <div class="funnel-track">
+          <div class="funnel-bar" style="width:49.6%;background:#4b5563">
+            <span class="funnel-count">123</span>
+          </div>
+        </div>
+        <span class="funnel-pct">50%</span>
+      </div>
+      <div class="insight" style="margin-top:16px">
+        Alvos acionáveis agora: <strong>125 igrejas</strong> (Hot + Warm + Cold) com dados de contato disponíveis.
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="section-label">Distribuição por diocese</p>
+      <div style="position:relative;height:220px">
+        <canvas id="dioceseChart" role="img" aria-label="Distribuição por diocese">NY:143, Miami:35, FTL:34, Orlando:31, Venice:5</canvas>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px">
+        <span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#ef4444;display:inline-block"></span>Hot</span>
+        <span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;display:inline-block"></span>Warm</span>
+        <span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#3b82f6;display:inline-block"></span>Cold</span>
+        <span style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#4b5563;display:inline-block"></span>Não adequado</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRESENÇA + WARM POR DIOCESE -->
+  <div class="charts-row">
+    <div class="card">
+      <p class="section-label">Presença online — leads acionáveis (125)</p>
+      <div class="presence-row">
+        <span class="presence-left">🌐 Site próprio</span>
+        <div class="presence-right">
+          <div class="pbar-wrap"><div class="pbar" style="width:100%;background:#3b82f6"></div></div>
+          <span style="font-size:12px;font-weight:600;width:30px;text-align:right">125</span>
+        </div>
+      </div>
+      <div class="presence-row">
+        <span class="presence-left">📞 Telefone</span>
+        <div class="presence-right">
+          <div class="pbar-wrap"><div class="pbar" style="width:82%;background:#10b981"></div></div>
+          <span style="font-size:12px;font-weight:600;width:30px;text-align:right">~102</span>
+        </div>
+      </div>
+      <div class="presence-row">
+        <span class="presence-left">📘 Facebook</span>
+        <div class="presence-right">
+          <div class="pbar-wrap"><div class="pbar" style="width:9%;background:#1877f2"></div></div>
+          <span style="font-size:12px;font-weight:600;width:30px;text-align:right">11</span>
+        </div>
+      </div>
+      <div class="presence-row">
+        <span class="presence-left">✉️ E-mail direto</span>
+        <div class="presence-right">
+          <div class="pbar-wrap"><div class="pbar" style="width:10%;background:#8b5cf6"></div></div>
+          <span style="font-size:12px;font-weight:600;width:30px;text-align:right">8</span>
+        </div>
+      </div>
+      <div class="presence-row">
+        <span class="presence-left">▶️ YouTube</span>
+        <div class="presence-right">
+          <div class="pbar-wrap"><div class="pbar" style="width:4%;background:#ef4444"></div></div>
+          <span style="font-size:12px;font-weight:600;width:30px;text-align:right">5</span>
+        </div>
+      </div>
+      <div class="presence-row">
+        <span class="presence-left">📸 Instagram</span>
+        <div class="presence-right">
+          <div class="pbar-wrap"><div class="pbar" style="width:2%;background:#e1306c"></div></div>
+          <span style="font-size:12px;font-weight:600;width:30px;text-align:right">2</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="section-label">Warm leads por diocese (87 alvos)</p>
+      <div style="position:relative;height:220px">
+        <canvas id="warmChart" role="img" aria-label="Warm leads por diocese">NY:73, Miami:6, FTL:5, Orlando:3</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRIORITY TABLE -->
+  <div class="card" style="margin-bottom:24px">
+    <p class="section-label">Leads prioritários — ação imediata</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Igreja</th>
+            <th>Diocese</th>
+            <th>Status</th>
+            <th>Score</th>
+            <th>Contato disponível</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:600">Saint Mary's Catholic Church</td>
+            <td style="color:var(--text2)">Archdiocese of New York</td>
+            <td><span class="badge badge-hot">Hot</span></td>
+            <td>
+              <div class="score-wrap">
+                <span class="score-txt c-hot">5/5</span>
+                <div class="score-bar"><div class="score-fill" style="width:100%;background:#ef4444"></div></div>
+              </div>
+            </td>
+            <td style="color:var(--text2);font-size:12px">+1 201-384-0557 · tem bulletin PDF</td>
+            <td><button class="action-btn primary">📞 Ligar agora</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Saint Vincent Catholic Church</td>
+            <td style="color:var(--text2)">Diocese of Fort Lauderdale</td>
+            <td><span class="badge badge-warm">Warm</span></td>
+            <td>
+              <div class="score-wrap">
+                <span class="score-txt c-warm">3/5</span>
+                <div class="score-bar"><div class="score-fill" style="width:60%;background:#f59e0b"></div></div>
+              </div>
+            </td>
+            <td style="color:var(--text2);font-size:12px">Site + FB + YouTube + Twitter</td>
+            <td><button class="action-btn">Demo + email</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Saint Casimir Catholic Church</td>
+            <td style="color:var(--text2)">Archdiocese of New York</td>
+            <td><span class="badge badge-warm">Warm</span></td>
+            <td>
+              <div class="score-wrap">
+                <span class="score-txt c-warm">3/5</span>
+                <div class="score-bar"><div class="score-fill" style="width:60%;background:#f59e0b"></div></div>
+              </div>
+            </td>
+            <td style="color:var(--text2);font-size:12px">Office@casimir.church · +1 914-963-4766</td>
+            <td><button class="action-btn">✉️ Email direto</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Holy Name of Jesus</td>
+            <td style="color:var(--text2)">Diocese of Orlando</td>
+            <td><span class="badge badge-warm">Warm</span></td>
+            <td>
+              <div class="score-wrap">
+                <span class="score-txt c-warm">3/5</span>
+                <div class="score-bar"><div class="score-fill" style="width:60%;background:#f59e0b"></div></div>
+              </div>
+            </td>
+            <td style="color:var(--text2);font-size:12px">sdonnelly@hnj.org · FB + Instagram</td>
+            <td><button class="action-btn">✉️ Email direto</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Saint Matthias Roman Catholic</td>
+            <td style="color:var(--text2)">Archdiocese of New York</td>
+            <td><span class="badge badge-warm">Warm</span></td>
+            <td>
+              <div class="score-wrap">
+                <span class="score-txt c-warm">3/5</span>
+                <div class="score-bar"><div class="score-fill" style="width:60%;background:#f59e0b"></div></div>
+              </div>
+            </td>
+            <td style="color:var(--text2);font-size:12px">+1 718-821-6447 · Facebook ativo</td>
+            <td><button class="action-btn">📞 Ligar + demo</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Our Lady Queen of Heaven</td>
+            <td style="color:var(--text2)">Diocese of Fort Lauderdale</td>
+            <td><span class="badge badge-warm">Warm</span></td>
+            <td>
+              <div class="score-wrap">
+                <span class="score-txt c-warm">2/5</span>
+                <div class="score-bar"><div class="score-fill" style="width:40%;background:#f59e0b"></div></div>
+              </div>
+            </td>
+            <td style="color:var(--text2);font-size:12px">olqh@bellsouth.net · mesma diocese cliente</td>
+            <td><button class="action-btn">✉️ Email direto</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">Saint Lawrence Catholic Church</td>
+            <td style="color:var(--text2)">Archdiocese of Miami</td>
+            <td><span class="badge badge-warm">Warm</span></td>
+            <td>
+              <div class="score-wrap">
+                <span class="score-txt c-warm">2/5</span>
+                <div class="score-bar"><div class="score-fill" style="width:40%;background:#f59e0b"></div></div>
+              </div>
+            </td>
+            <td style="color:var(--text2);font-size:12px">Info@stlawrencemiami.org · +1 305-932-3560</td>
+            <td><button class="action-btn">✉️ Email direto</button></td>
+          </tr>
+          <tr>
+            <td colspan="6" style="font-size:11px;color:var(--text3);padding:10px 12px">
+              + 80 warm leads e 37 cold leads no CSV completo com telefone disponível
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ADS STRATEGY -->
+  <div class="card" style="margin-bottom:24px">
+    <p class="section-label">Estratégia de marketing e ads recomendada</p>
+    <div class="ads-grid">
+      <div class="ads-card">
+        <div class="ads-header">
+          <div class="ads-icon" style="background:rgba(66,133,244,.15)">🔍</div>
+          Google Ads — Search
+          <span class="tag tag-google">Alta prioridade</span>
+        </div>
+        <div class="ads-body">
+          <strong>Palavras-chave:</strong><br>
+          "church bulletin software", "catholic parish newsletter automation", "weekly bulletin for churches", "parish communications tool"<br><br>
+          <strong>Audiência:</strong> Parish Administrator, Director of Communications, Church Secretary — geolocalizados em NY, Miami e FL.<br><br>
+          <strong>Orçamento sugerido:</strong> $500–800/mês · CPC estimado $2–5
+        </div>
+      </div>
+      <div class="ads-card">
+        <div class="ads-header">
+          <div class="ads-icon" style="background:rgba(24,119,242,.15)">📘</div>
+          Meta Ads (Facebook / Instagram)
+          <span class="tag tag-meta">Awareness</span>
+        </div>
+        <div class="ads-body">
+          <strong>Segmentação:</strong> Interesses "Catholic Church", "Parish Administration", "Religious nonprofit" + Lookalike das 11 igrejas com Facebook.<br><br>
+          <strong>Formato:</strong> Vídeo 30s mostrando flyer gerado automaticamente — antes/depois do boletim. Retargeting para quem visitou o site.<br><br>
+          <strong>Orçamento sugerido:</strong> $300–500/mês · CPM estimado $8–12
+        </div>
+      </div>
+      <div class="ads-card">
+        <div class="ads-header">
+          <div class="ads-icon" style="background:rgba(139,92,246,.15)">✉️</div>
+          Outreach direto — 8 emails
+          <span class="tag tag-email">Maior conversão</span>
+        </div>
+        <div class="ads-body">
+          <strong>8 emails diretos disponíveis:</strong><br>
+          sdonnelly@hnj.org, Office@casimir.church, Info@stlawrencemiami.org, olqh@bellsouth.net, Secretary@SaintAnastasia.org, info@stjosephsyorkville.com, stanselmrectory@aol.com, gxdmlvmiami@gmail.com<br><br>
+          <strong>Abordagem:</strong> Mostrar exemplo do produto feito para St. Katharine Drexel. Taxa de resposta esperada: 15–25%.
+        </div>
+      </div>
+      <div class="ads-card">
+        <div class="ads-header">
+          <div class="ads-icon" style="background:rgba(16,185,129,.15)">📞</div>
+          Cold call — 102 telefones
+          <span class="tag tag-call">Pipeline rápido</span>
+        </div>
+        <div class="ads-body">
+          <strong>Prioridade:</strong><br>
+          1. Hot lead — Saint Mary's (fechar agora)<br>
+          2. Warm com email disponível (8 igrejas)<br>
+          3. Warm sem email — NY 73, Miami 6, FTL 5<br><br>
+          <strong>Script:</strong> "Já processamos o boletim de St. Katharine Drexel automaticamente — posso mostrar em 5 min como ficaria para vocês?"
+        </div>
+      </div>
+    </div>
+    <div class="insight">
+      <strong>Sequência recomendada:</strong> Email direto (8 leads) → Ligar pro Hot lead imediatamente → Google Ads Search → Meta Ads retargeting warm leads com Facebook
+    </div>
+  </div>
+
+  <!-- EMAILS -->
+  <div class="card">
+    <p class="section-label">Emails de outreach prontos — copiar e enviar</p>
+    <div class="tabs">
+      <button class="tab active" onclick="showEmail(0)">Holy Name of Jesus</button>
+      <button class="tab" onclick="showEmail(1)">Saint Casimir</button>
+      <button class="tab" onclick="showEmail(2)">Saint Lawrence</button>
+      <button class="tab" onclick="showEmail(3)">Our Lady of Heaven</button>
+      <button class="tab" onclick="showEmail(4)">Saint Joseph's</button>
+      <button class="tab" onclick="showEmail(5)">Saint Anastasia</button>
+      <button class="tab" onclick="showEmail(6)">Saint Anselm</button>
+      <button class="tab" onclick="showEmail(7)">Our Lady La Vang</button>
+    </div>
+
+    <div id="email0" class="email-card visible">
+      <div class="email-meta-row">
+        <span class="em-label">Para</span><span class="em-value"><a href="mailto:sdonnelly@hnj.org">sdonnelly@hnj.org</a></span>
+        <span class="em-label">Assunto</span><span class="em-value">Automating your weekly bulletin — quick question</span>
+        <span class="em-label">Diocese</span><span class="em-value" style="color:var(--text3)">Diocese of Orlando · Score 3 · FB + Instagram</span>
+      </div>
+      <div class="email-body-text" id="et0">Hi,
+
+My name is Matheus, and I'm reaching out from Atimo — we build a tool called Bulletin Scan that automates the weekly parish bulletin workflow.
+
+I noticed Holy Name of Jesus has an active website and social media presence, which tells me your communications team is already doing great work. I wanted to share something that might save your staff a few hours every week.
+
+Here's what Bulletin Scan does: it reads your weekly bulletin PDF and automatically produces ready-to-post social media graphics (1080×1350 px) and a trilingual announcement page in English, Spanish, and Portuguese — no design work, no copy-writing, done in minutes.
+
+We're already running this for a parish in the Diocese of Fort Lauderdale and the feedback has been that it genuinely frees up staff time.
+
+Would you be open to a 10-minute call this week? I can show you a live example using a recent bulletin from Holy Name — you'd see exactly what the output looks like for your parish specifically.
+
+Best regards,
+Matheus
+Atimo
+[seu telefone] · atimo.com</div>
+      <div class="email-actions">
+        <button class="copy-btn" onclick="copyEmail(0)">📋 Copiar email</button>
+      </div>
+    </div>
+
+    <div id="email1" class="email-card">
+      <div class="email-meta-row">
+        <span class="em-label">Para</span><span class="em-value"><a href="mailto:Office@casimir.church">Office@casimir.church</a></span>
+        <span class="em-label">Assunto</span><span class="em-value">Save hours on your weekly bulletin — here's how</span>
+        <span class="em-label">Diocese</span><span class="em-value" style="color:var(--text3)">Archdiocese of New York — Yonkers · Score 3 · Facebook</span>
+      </div>
+      <div class="email-body-text" id="et1">Hi,
+
+I'm reaching out to the Saint Casimir office because we work specifically with Catholic parishes on their weekly bulletin communications.
+
+Bulletin Scan is a tool from Atimo that takes your existing bulletin PDF each week and automatically generates:
+- Social media graphics ready to post (no design needed)
+- A trilingual parish announcement page in English, Spanish, and Portuguese
+
+The whole process takes minutes — our system handles everything from extracting the announcements to creating the visuals.
+
+I'd love to show you a live demo using one of Saint Casimir's own bulletins, so you can see exactly what the output looks like. Would a quick 10-minute call work this week?
+
+Thank you for your time,
+Matheus
+Atimo
+[seu telefone] · atimo.com</div>
+      <div class="email-actions">
+        <button class="copy-btn" onclick="copyEmail(1)">📋 Copiar email</button>
+      </div>
+    </div>
+
+    <div id="email2" class="email-card">
+      <div class="email-meta-row">
+        <span class="em-label">Para</span><span class="em-value"><a href="mailto:Info@stlawrencemiami.org">Info@stlawrencemiami.org</a></span>
+        <span class="em-label">Assunto</span><span class="em-value">A tool for your parish bulletin — made for South Florida</span>
+        <span class="em-label">Diocese</span><span class="em-value" style="color:var(--text3)">Archdiocese of Miami · Score 2</span>
+      </div>
+      <div class="email-body-text" id="et2">Hi,
+
+My name is Matheus and I'm reaching out from Atimo, a company based in South Florida that works with Catholic parishes.
+
+We built a product called Bulletin Scan that might be useful for your communications team. Each week, it reads your parish bulletin PDF and automatically creates:
+- Ready-to-post social media images (Instagram / Facebook sized)
+- A trilingual parish announcement page in English, Spanish, and Portuguese
+
+Given that Saint Lawrence serves a diverse South Florida community, the trilingual output in particular tends to be very useful.
+
+We already work with a parish in the Diocese of Fort Lauderdale and would love to show you what the tool produces. Could we schedule 10 minutes this week for a quick live demo?
+
+Best,
+Matheus
+Atimo
+[seu telefone] · atimo.com</div>
+      <div class="email-actions">
+        <button class="copy-btn" onclick="copyEmail(2)">📋 Copiar email</button>
+      </div>
+    </div>
+
+    <div id="email3" class="email-card">
+      <div class="email-meta-row">
+        <span class="em-label">Para</span><span class="em-value"><a href="mailto:olqh@bellsouth.net">olqh@bellsouth.net</a></span>
+        <span class="em-label">Assunto</span><span class="em-value">Automating parish bulletin communications — a quick idea</span>
+        <span class="em-label">Diocese</span><span class="em-value" style="color:var(--text3)">Diocese of Fort Lauderdale · Score 2 · mesma diocese do cliente</span>
+      </div>
+      <div class="email-body-text" id="et3">Hi,
+
+I'm reaching out because we work with a parish right in the Diocese of Fort Lauderdale — Saint Katharine Drexel in Weston — and thought Our Lady Queen of Heaven might find our tool equally useful.
+
+Bulletin Scan, by Atimo, automates the weekly bulletin process. You upload your bulletin PDF and within minutes you get:
+- Social media graphics formatted for Facebook and Instagram
+- A trilingual parish page in English, Spanish, and Portuguese
+
+Your communications team keeps doing what they do — the tool just removes the repetitive production work.
+
+Would you be open to a short call this week? I can show you a live demo using content from one of your own recent bulletins.
+
+Thank you,
+Matheus
+Atimo
+[seu telefone] · atimo.com</div>
+      <div class="email-actions">
+        <button class="copy-btn" onclick="copyEmail(3)">📋 Copiar email</button>
+      </div>
+    </div>
+
+    <div id="email4" class="email-card">
+      <div class="email-meta-row">
+        <span class="em-label">Para</span><span class="em-value"><a href="mailto:info@stjosephsyorkville.com">info@stjosephsyorkville.com</a></span>
+        <span class="em-label">Assunto</span><span class="em-value">Your weekly bulletin — a time-saving tool for your team</span>
+        <span class="em-label">Diocese</span><span class="em-value" style="color:var(--text3)">Archdiocese of New York — Upper East Side · Score 2</span>
+      </div>
+      <div class="email-body-text" id="et4">Hi,
+
+My name is Matheus from Atimo. I came across Saint Joseph's while researching parishes in the Archdiocese of New York and wanted to share a tool that might be useful for your weekly communications.
+
+Bulletin Scan reads your parish bulletin PDF each week and automatically produces social media graphics and a multilingual announcement page — English, Spanish, and Portuguese — with no extra work from your staff.
+
+New York parishes in particular benefit from the multilingual output given the diversity of the communities they serve.
+
+I'd love to walk you through a 10-minute demo. We can pull up one of your own bulletins so you see exactly what the output would look like for Saint Joseph's specifically.
+
+Would this week work for a quick call?
+
+Best,
+Matheus
+Atimo
+[seu telefone] · atimo.com</div>
+      <div class="email-actions">
+        <button class="copy-btn" onclick="copyEmail(4)">📋 Copiar email</button>
+      </div>
+    </div>
+
+    <div id="email5" class="email-card">
+      <div class="email-meta-row">
+        <span class="em-label">Para</span><span class="em-value"><a href="mailto:Secretary@SaintAnastasia.org">Secretary@SaintAnastasia.org</a></span>
+        <span class="em-label">Assunto</span><span class="em-value">A note for the parish secretary — bulletin automation</span>
+        <span class="em-label">Diocese</span><span class="em-value" style="color:var(--text3)">Archdiocese of New York — Teaneck, NJ · Score 2</span>
+      </div>
+      <div class="email-body-text" id="et5">Hi,
+
+I know the parish secretary's inbox is busy, so I'll keep this short.
+
+We built a tool called Bulletin Scan that takes your weekly bulletin PDF and automatically turns it into social media posts and a multilingual parish announcement page — in English, Spanish, and Portuguese. No extra work on your end once it's set up.
+
+The reason I'm reaching out specifically to Saint Anastasia is that your parish clearly invests in communications, and this tool tends to be most useful for parishes that are already organized.
+
+Would it be worth 10 minutes of your time — or the communications coordinator's — to see a quick demo? I can work around your schedule.
+
+Thank you,
+Matheus
+Atimo
+[seu telefone] · atimo.com</div>
+      <div class="email-actions">
+        <button class="copy-btn" onclick="copyEmail(5)">📋 Copiar email</button>
+      </div>
+    </div>
+
+    <div id="email6" class="email-card">
+      <div class="email-meta-row">
+        <span class="em-label">Para</span><span class="em-value"><a href="mailto:stanselmrectory@aol.com">stanselmrectory@aol.com</a></span>
+        <span class="em-label">Assunto</span><span class="em-value">Quick question about your weekly bulletin</span>
+        <span class="em-label">Diocese</span><span class="em-value" style="color:var(--text3)">Archdiocese of New York — Bay Ridge, Brooklyn · Score 2</span>
+      </div>
+      <div class="email-body-text" id="et6">Hi,
+
+I'm reaching out to the Saint Anselm rectory with a quick question: how much time does your team spend producing content from the weekly bulletin each week?
+
+We built a tool at Atimo called Bulletin Scan that takes the bulletin PDF and automatically creates social media graphics and a trilingual announcement page — English, Spanish, and Portuguese — with no manual design or writing work.
+
+It was built specifically for Catholic parishes that want to reach more of their community online without adding to their staff's workload.
+
+Would anyone at the rectory be open to a 10-minute call to see a live demo? Happy to fit around your schedule.
+
+Thank you for your time,
+Matheus
+Atimo
+[seu telefone] · atimo.com</div>
+      <div class="email-actions">
+        <button class="copy-btn" onclick="copyEmail(6)">📋 Copiar email</button>
+      </div>
+    </div>
+
+    <div id="email7" class="email-card">
+      <div class="email-meta-row">
+        <span class="em-label">Para</span><span class="em-value"><a href="mailto:gxdmlvmiami@gmail.com">gxdmlvmiami@gmail.com</a></span>
+        <span class="em-label">Assunto</span><span class="em-value">Multilingual bulletin tool for your parish community</span>
+        <span class="em-label">Diocese</span><span class="em-value" style="color:var(--text3)">Diocese of Fort Lauderdale — Hallandale Beach · Score 2 · comunidade vietnamita</span>
+      </div>
+      <div class="email-body-text" id="et7">Hi,
+
+My name is Matheus from Atimo. I'm reaching out because I think our tool could be especially useful for Our Lady of La Vang given your community's multilingual needs.
+
+Bulletin Scan reads your weekly parish bulletin PDF and automatically produces:
+- Social media graphics ready to post on Facebook or Instagram
+- A trilingual announcement page in English, Spanish, and Portuguese
+
+We're aware that a Vietnamese-Catholic community like yours may communicate in additional languages — that's something we'd be happy to discuss as we continue developing the tool.
+
+We already work with a parish in Fort Lauderdale (Saint Katharine Drexel) and would love to show you what Bulletin Scan can do for La Vang specifically.
+
+Would a short call this week work for you?
+
+Best regards,
+Matheus
+Atimo
+[seu telefone] · atimo.com</div>
+      <div class="email-actions">
+        <button class="copy-btn" onclick="copyEmail(7)">📋 Copiar email</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <div class="footer-left">Dados: Overpass API · OpenStreetMap · Análise: 11/06/2026 · 248 igrejas prospectadas</div>
+  <div class="footer-logo">Atimo</div>
+</div>
+
+<script>
+  const emailCards = document.querySelectorAll('.email-card');
+  const emailTabs = document.querySelectorAll('.tab');
+
+  function showEmail(i) {
+    emailCards.forEach((c, idx) => c.classList.toggle('visible', idx === i));
+    emailTabs.forEach((t, idx) => t.classList.toggle('active', idx === i));
+  }
+
+  function copyEmail(i) {
+    const subjectEl = document.querySelectorAll('.em-value')[i * 3 + 1];
+    const toEl = document.querySelectorAll('.em-value a')[i];
+    const body = document.getElementById('et' + i);
+    if (!body) return;
+    const text = (toEl ? 'To: ' + toEl.textContent + '\n' : '') +
+                 (subjectEl ? 'Subject: ' + subjectEl.textContent + '\n\n' : '\n') +
+                 body.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btns = document.querySelectorAll('.copy-btn');
+      if (btns[i]) {
+        btns[i].textContent = '✅ Copiado!';
+        setTimeout(() => { btns[i].textContent = '📋 Copiar email'; }, 2000);
+      }
+    });
+  }
+
+  // Charts
+  const dioceseCtx = document.getElementById('dioceseChart').getContext('2d');
+  new Chart(dioceseCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Archdioc. of\nNew York', 'Archdioc.\nof Miami', 'Diocese of\nFort Lauderd.', 'Diocese of\nOrlando', 'Diocese\nof Venice'],
+      datasets: [
+        { label: 'Hot', data: [1,0,0,0,0], backgroundColor: '#ef4444', borderRadius: 3, borderSkipped: false },
+        { label: 'Warm', data: [73,6,5,3,0], backgroundColor: '#f59e0b', borderRadius: 3, borderSkipped: false },
+        { label: 'Cold', data: [31,2,3,1,0], backgroundColor: '#3b82f6', borderRadius: 3, borderSkipped: false },
+        { label: 'Não adequado', data: [38,27,26,27,5], backgroundColor: '#374151', borderRadius: 3, borderSkipped: false }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false }, border: { display: false } },
+        y: { stacked: true, ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' }, border: { display: false } }
+      }
+    }
+  });
+
+  const warmCtx = document.getElementById('warmChart').getContext('2d');
+  new Chart(warmCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['New York (73)', 'Miami (6)', 'Fort Lauderdale (5)', 'Orlando (3)'],
+      datasets: [{
+        data: [73, 6, 5, 3],
+        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6'],
+        borderWidth: 0,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12, padding: 12 }
+        }
+      }
+    }
+  });
+</script>
+</body>
+</html>
