@@ -17,7 +17,7 @@ Saidas:
     data/prospects_refined.csv -> CSV completo para analise
 """
 
-import csv, json, re, time, sys
+import csv, re, time, sys
 from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin, urlparse
@@ -354,38 +354,11 @@ def main():
     print(f"  ⚫ None: {counts['none']}")
     print(f"  Total acionaveis: {counts['hot']+counts['warm']+counts['cold']}")
 
-    # ── PASSO 4: gerar JS para o mapa ───────────────────────────
-    js_data = [{
-        "name":          c["name"],
-        "diocese":       c["diocese"],
-        "lead":          c["lead"],
-        "score":         c["score"],
-        "bulletinFound": c["bulletin_found"],
-        "bulletinUrl":   c["bulletin_url"],
-        "address":       c["address"],
-        "phone":         c["phone"],
-        "email":         c["email"],
-        "website":       c["website"],
-        "socials":       c["socials"],
-        "lat":           c["lat"],
-        "lng":           c["lng"],
-        "enriched":      True,
-    } for c in churches]
-
-    js = (
-        f"// Gerado em {date.today()} | {len(js_data)} igrejas\n"
-        f"// Hot:{counts['hot']} Warm:{counts['warm']} Cold:{counts['cold']}\n"
-        f"var PRELOADED_DATA = {json.dumps(js_data, ensure_ascii=False, separators=(',',':'))};\n"
-    )
-    with open("/project/app/prospects_data.js", "w", encoding="utf-8") as f:
-        f.write(js)
-    print(f"\n✓ app/prospects_data.js gerado  ({len(js)//1024}KB)")
-
-    # ── PASSO 5: gerar CSV refinado ─────────────────────────────
+    # ── PASSO 4: gerar CSV refinado ─────────────────────────────
     lead_label = {"hot": "Hot Lead", "warm": "Warm Lead", "cold": "Cold Lead", "none": "Not Suitable"}
     cols = ["Name","Diocese","Lead","Score","Score Detail","Bulletin PDF","Bulletin URL",
             "Address","Phone","Email","Website","Facebook","Instagram","YouTube","Twitter","Lat","Lng"]
-    with open("/project/data/prospects_refined.csv", "w", newline="", encoding="utf-8-sig") as f:
+    with open("/data/prospects_refined.csv", "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         w.writerow(cols)
         for c in sorted(churches, key=lambda x: ({"hot":0,"warm":1,"cold":2,"none":3}[x["lead"]], -x["score"])):
@@ -401,8 +374,8 @@ def main():
                 "Yes" if c["socials"]["twitter"]   else "No",
                 c["lat"], c["lng"],
             ])
-    print(f"✓ prospects_refined.csv gerado")
-    print(f"\nAbra mapa_prospects.html no browser para ver os dados atualizados.")
+    print(f"✓ /data/prospects_refined.csv gerado")
+    print(f"\nDados disponíveis em http://localhost:8000")
 
 if __name__ == "__main__":
     main()

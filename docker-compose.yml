@@ -1,0 +1,15 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  scraper:
+    build: .
+    profiles: ["scraper"]
+    volumes:
+      - ./data:/data
+    command: python -u scraper/refinar_prospects.py

@@ -897,5 +897,20 @@ Atimo
     }
   });
 </script>
+
+<script>
+  fetch('/api/stats').then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+    if (!d) return;
+    document.querySelector('.kpi-value.c-total').textContent = d.total ?? '–';
+    document.querySelector('.kpi-value.c-hot').textContent  = d.hot   ?? '–';
+    document.querySelector('.kpi-value.c-warm').textContent = d.warm  ?? '–';
+    document.querySelector('.kpi-value.c-cold').textContent = d.cold  ?? '–';
+    document.querySelector('.kpi-value.c-ns').textContent   = d.none  ?? '–';
+    var actionable = (d.hot||0) + (d.warm||0) + (d.cold||0);
+    var ins = document.querySelector('.insight strong');
+    if (ins) ins.textContent = actionable + ' igrejas';
+    if (d.generated) document.querySelector('.header-date').textContent = 'Gerado em ' + d.generated;
+  }).catch(function(){});
+</script>
 </body>
 </html>
